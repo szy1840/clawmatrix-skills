@@ -11,65 +11,111 @@ Trigger this framework when:
 - Subreddit name is extracted from user request (e.g., "去 r/Entrepreneur 发个帖")
 - No cached archive exists in `sub-archives/` directory
 
-### Step-by-Step Analysis Flow
+---
 
-#### Step 1: Navigate to Subreddit About Page
+## Phase 1: Fetch Metadata via Reddit API (Fast Path)
+
+**Use Reddit's free JSON API** — no auth required, ~60 req/min limit.
+
+### Step 1: Call Reddit API
+
+```bash
+curl -s "https://www.reddit.com/r/<subname>/about.json" | jq '.data'
+```
+
+**Expected fields from API:**
+
+| Field | JSON Path | Example |
+|-------|-----------|---------|
+| **Subreddit name** | `.display_name` | `Entrepreneur` |
+| **Title** | `.title` | `Entrepreneur` |
+| **Description** | `.public_description` | `Community for entrepreneurs...` |
+| **Members** | `.subscribers` | `1234567` |
+| **Active users** | `.accounts_active` | `12345` |
+| **Created (UTC)** | `.created_utc` | `1234567890` |
+| **Subreddit type** | `.subreddit_type` | `public` |
+| **NSFW** | `.over18` | `false` |
+| **Icon URL** | `.icon_img` | `https://...` |
+
+### Step 2: Parse and Validate
+
+**Success criteria:**
+- `.subreddit_type` is `public` (not `private`, `restricted`, `gold_restricted`)
+- `.subscribers` > 0
+- No error in response
+
+**Error cases:**
+
+| Response | Meaning | Action |
+|----------|---------|--------|
+| `{"message": "Not Found"}` | Subreddit doesn't exist | Check spelling, suggest alternates |
+| `{"message": "private"}` | Private subreddit | Report "Subreddit is private", ask for alternate |
+| `{"message": "quarantined"}` | Quarantined sub | Warn user, may need opt-in |
+
+### Step 3: Generate Profile Skeleton
+
+```markdown
+## r/{SUBNAME}
+
+| Field | Value |
+|-------|-------|
+| **Members** | {subscribers} |
+| **Active Users** | {accounts_active} |
+| **Description** | {public_description} |
+| **Created** | {date from created_utc} |
+| **Type** | {subreddit_type} |
+
+### Top Rules
+*(Fetch via browser in Phase 2)*
+
+### What Works
+*(Analyze via browser in Phase 2)*
+
+### Notes
+API metadata fetched successfully.
+```
+
+---
+
+## Phase 2: Fetch Rules + Content Analysis (Browser Fallback)
+
+**Rules and post patterns are NOT in the API** — use browser only for this.
+
+### Step 4: Extract Community Rules (Browser)
+
 ```
 URL: https://www.reddit.com/r/<subname>/about
 ```
-- Navigate to the about page
-- Snapshot with `refs=aria`, `depth=12`
 
-#### Step 2: Extract Community Metadata
-Locate and extract these elements by semantic cues:
+1. Navigate to about page
+2. Snapshot with `refs=aria`, `depth=12`
+3. Find "R/<SUBNAME> RULES" section
+4. If collapsed, click expand button, wait 500ms, re-snapshot
+5. Extract each rule as: `**Rule Name**: Description`
 
-| Field | Semantic Locator | Fallback |
-|-------|------------------|----------|
-| **Member count** | text containing "members" / "Members" | regex: `[\d,\.]+[kKmM]?` near "member" |
-| **Online count** | text containing "online" / "Online" | same as above |
-| **Description** | paragraph under "About Community" heading | first non-nav paragraph in sidebar |
-| **Created date** | text containing "Created" | regex: `[A-Z][a-z]+ \d+, \d{4}` |
+### Step 5: Analyze Recent Posts (Optional, Browser)
 
-#### Step 3: Extract Community Rules
-```
-Target: "R/<SUBNAME> RULES" section (may need to expand)
-```
-
-**Expand Rules Section (if collapsed):**
-1. Find button/heading with text "Rules" or "R/<subname> RULES"
-2. If rules not visible, look for expand arrow (role=button, name contains "expand" or "show")
-3. Click to expand, wait 500ms, re-snapshot
-
-**Extract Each Rule:**
-For each rule item in the rules list:
-- Rule number/title (e.g., "Rule 1: Be respectful")
-- Rule description (paragraph under the rule title)
-- Any associated icons (warning/restriction indicators)
-
-Store rules as structured list:
-```markdown
-### Rules
-1. **Rule Name**: Description
-2. **Rule Name**: Description
-...
-```
-
-#### Step 4: Analyze Recent Posts (Optional but Recommended)
 ```
 URL: https://www.reddit.com/r/<subname>/new
 ```
-Navigate to /new tab and snapshot to analyze:
+
+Navigate to /new, snapshot, analyze:
 
 | Signal | What to Look For |
 |--------|------------------|
 | **Post frequency** | Timestamp of last 5-10 posts |
 | **Common flairs** | Flair text near post titles |
-| **Title patterns** | Common prefixes/suffixes, question vs statement ratio |
-| **Engagement level** | Comment counts and upvote ratios |
-| **Content type** | Text posts vs links vs images |
+| **Title patterns** | Question vs statement ratio |
+| **Engagement** | Comment counts, upvote ratios |
+| **Content type** | Text vs links vs images |
 
-#### Step 5: Generate Subreddit Profile
-Create a concise profile following the format in `sub-archives.md`:
+---
+
+## Phase 3: Compile and Cache
+
+### Step 6: Generate Final Profile
+
+Combine API metadata + browser rules into `sub-archives.md` format:
 
 ```markdown
 ## r/{SUBNAME}
@@ -98,42 +144,37 @@ Create a concise profile following the format in `sub-archives.md`:
 
 ```
 
-#### Step 6: Append to Archive File
+### Step 7: Append to Archive
 
-Append the generated profile to:
-```
-references/sub-archives.md
-```
+Append to `references/sub-archives.md` using the template at bottom of file.
 
-Use the template format at the bottom of `sub-archives.md`. Keep it concise — only core info needed for posting decisions.
+---
 
-### Integration with Content Generation
+## Integration with Content Generation
 
 After generating the dynamic archive:
 
 1. **Load the archive** as if it were a pre-defined profile in `post-strategy.md` §1
 2. **Extract cultural signals** (tone, welcome/avoid patterns, title styles)
 3. **Apply to content generation** following `SKILL.md` Workflow Router
-4. **Flag for user review** if confidence is low (e.g., rules unclear, sparse data)
+4. **Flag for user review** if confidence is low
 
 ### Confidence Scoring
 
-After analysis, assign confidence level:
-
 | Level | Criteria | Action |
 |-------|----------|--------|
-| **High** | Rules clear + 10+ recent posts analyzed | Proceed with content generation |
-| **Medium** | Rules clear but few posts, or vice versa | Generate content but flag for user review |
-| **Low** | Rules missing/unclear + sparse data | Ask user for more context or manual review |
+| **High** | API success + rules clear + 10+ posts analyzed | Proceed |
+| **Medium** | API success + rules clear but few posts | Generate, flag for review |
+| **Low** | API failed or rules missing/unclear | Ask for context or manual review |
 
 ### Error Handling
 
 | Error | Recovery |
 |-------|----------|
-| About page blocked (private sub) | Report "Subreddit is private" and ask for alternate |
-| Rules section not found | Proceed without rules, flag as "unmoderated or rules hidden" |
+| API returns "private" | Report "Subreddit is private", ask for alternate |
+| API returns "Not Found" | Check spelling, suggest similar subs |
+| Rules section not found | Proceed without rules, flag as "unmoderated or hidden" |
 | Rate limited / captcha | Pause and ask user to complete challenge |
-| Subreddit doesn't exist | Check spelling, suggest similar subs |
 
 ---
 
