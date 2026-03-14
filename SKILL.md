@@ -1,6 +1,6 @@
 ---
 name: reddit-engagement
-description: Create and execute robust Reddit engagement workflows (create post, add comment, upvote) using browser accessibility-tree semantics instead of brittle DOM ids/CSS selectors. Use when asked to automate Reddit actions with high success rate across UI changes, A/B tests, and localization differences; especially when reliability and intent-based element targeting are required.
+description: Reddit 互动自动化技能（发帖/评论/点赞）。**触发条件**：(1) 用户提到"Reddit 评论/发帖/点赞"等关键词；(2) 用户提供 Reddit 链接并要求互动；(3) 用户说"去评论这个帖子"并附上 reddit.com 链接。**自动执行**：识别 subreddit→读取社区规则→生成内容→发布。使用可访问性语义定位，不依赖脆弱的 DOM 选择器。
 ---
 
 # Reddit Engagement
