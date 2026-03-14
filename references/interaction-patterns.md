@@ -13,15 +13,17 @@ Trigger this framework when:
 
 ---
 
-## Phase 1: Fetch Metadata via Reddit API (Fast Path)
+## Phase 1: Fetch ALL Data via Reddit API (Fast Path)
 
-**Use Reddit's free JSON API** — no auth required, ~60 req/min limit.
+**Use Reddit's free JSON API** — no auth required, ~60 req/min limit. **Rules ARE included in API response!**
 
 ### Step 1: Call Reddit API
 
 ```bash
-curl -s "https://www.reddit.com/r/<subname>/about.json" | jq '.data'
+curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" "https://www.reddit.com/r/<subname>/about.json"
 ```
+
+**⚠️ Important:** Must include proper User-Agent header, or Reddit will block with "network policy" error.
 
 **Expected fields from API:**
 
@@ -29,13 +31,15 @@ curl -s "https://www.reddit.com/r/<subname>/about.json" | jq '.data'
 |-------|-----------|---------|
 | **Subreddit name** | `.display_name` | `Entrepreneur` |
 | **Title** | `.title` | `Entrepreneur` |
-| **Description** | `.public_description` | `Community for entrepreneurs...` |
-| **Members** | `.subscribers` | `1234567` |
+| **Description** | `.public_description` | Short blurb |
+| **Full rules + description** | `.description` | **Complete rules in Markdown/HTML** |
+| **Members** | `.subscribers` | `5106958` |
 | **Active users** | `.accounts_active` | `12345` |
-| **Created (UTC)** | `.created_utc` | `1234567890` |
+| **Created (UTC)** | `.created_utc` | `1219348682.0` |
 | **Subreddit type** | `.subreddit_type` | `public` |
 | **NSFW** | `.over18` | `false` |
-| **Icon URL** | `.icon_img` | `https://...` |
+| **Submit text** | `.submit_text` | Posting requirements |
+| **Submission type** | `.submission_type` | `self`, `link`, `any` |
 
 ### Step 2: Parse and Validate
 
@@ -51,8 +55,35 @@ curl -s "https://www.reddit.com/r/<subname>/about.json" | jq '.data'
 | `{"message": "Not Found"}` | Subreddit doesn't exist | Check spelling, suggest alternates |
 | `{"message": "private"}` | Private subreddit | Report "Subreddit is private", ask for alternate |
 | `{"message": "quarantined"}` | Quarantined sub | Warn user, may need opt-in |
+| HTML "Blocked" page | Missing/bad User-Agent | Retry with proper UA header |
 
-### Step 3: Generate Profile Skeleton
+### Step 3: Extract Rules from `.description` Field
+
+The `.description` field contains full rules in Markdown format. Example parsing:
+
+```bash
+# Extract description (contains rules)
+curl -sL -A "Mozilla/5.0" "https://www.reddit.com/r/<subname>/about.json" \
+  | jq -r '.data.description'
+```
+
+**Parse rules from Markdown:**
+```markdown
+##Submission/commenting Rules:
+ 
+1) **10 comment karma in /r/Entrepreneur to post**  
+   [rule details...]
+
+2) **No Promotion**  
+   [rule details...]
+
+3) **No Personal Attacks**  
+   [rule details...]
+```
+
+Extract top 3-5 rules by finding numbered patterns: `^\d+\)\s*\*\*(.+?)\*\*`
+
+### Step 4: Generate Complete Profile
 
 ```markdown
 ## r/{SUBNAME}
@@ -63,35 +94,29 @@ curl -s "https://www.reddit.com/r/<subname>/about.json" | jq '.data'
 | **Active Users** | {accounts_active} |
 | **Description** | {public_description} |
 | **Created** | {date from created_utc} |
-| **Type** | {subreddit_type} |
+| **Submission Type** | {submission_type} |
+| **Post Requirements** | {submit_text} |
 
 ### Top Rules
-*(Fetch via browser in Phase 2)*
-
-### What Works
-*(Analyze via browser in Phase 2)*
+1. {Rule 1 title}: {summary}
+2. {Rule 2 title}: {summary}
+3. {Rule 3 title}: {summary}
+4. {Rule 4 title}: {summary}
+5. {Rule 5 title}: {summary}
 
 ### Notes
-API metadata fetched successfully.
+- All data fetched via API (no browser needed)
+- Full rules available in `.description` field
 ```
 
 ---
 
-## Phase 2: Fetch Rules + Content Analysis (Browser Fallback)
+## Phase 2: Browser Fallback (Only if API Fails)
 
-**Rules and post patterns are NOT in the API** — use browser only for this.
-
-### Step 4: Extract Community Rules (Browser)
-
-```
-URL: https://www.reddit.com/r/<subname>/about
-```
-
-1. Navigate to about page
-2. Snapshot with `refs=aria`, `depth=12`
-3. Find "R/<SUBNAME> RULES" section
-4. If collapsed, click expand button, wait 500ms, re-snapshot
-5. Extract each rule as: `**Rule Name**: Description`
+**Use browser only when:**
+- API returns error (private/quarantined/blocked)
+- `.description` field is empty or malformed
+- Need to analyze recent post patterns for tone/content strategy
 
 ### Step 5: Analyze Recent Posts (Optional, Browser)
 
@@ -111,11 +136,9 @@ Navigate to /new, snapshot, analyze:
 
 ---
 
-## Phase 3: Compile and Cache
+## Phase 3: Cache to Archive
 
-### Step 6: Generate Final Profile
-
-Combine API metadata + browser rules into `sub-archives.md` format:
+### Step 6: Append to `sub-archives.md`
 
 ```markdown
 ## r/{SUBNAME}
@@ -123,11 +146,11 @@ Combine API metadata + browser rules into `sub-archives.md` format:
 | Field | Value |
 |-------|-------|
 | **Members** | X |
-| **Posting Threshold** | |
-| **AI Detection** | |
-| **Language** | |
-| **Tone** | |
-| **Self-promo** | |
+| **Posting Threshold** | {from submit_text} |
+| **AI Detection** | {check rules for "AI" keyword} |
+| **Language** | {infer from posts or description} |
+| **Tone** | {infer from description} |
+| **Self-promo** | {check rules} |
 
 ### Top 3 Rules
 1.
@@ -144,10 +167,6 @@ Combine API metadata + browser rules into `sub-archives.md` format:
 
 ```
 
-### Step 7: Append to Archive
-
-Append to `references/sub-archives.md` using the template at bottom of file.
-
 ---
 
 ## Integration with Content Generation
@@ -163,9 +182,9 @@ After generating the dynamic archive:
 
 | Level | Criteria | Action |
 |-------|----------|--------|
-| **High** | API success + rules clear + 10+ posts analyzed | Proceed |
-| **Medium** | API success + rules clear but few posts | Generate, flag for review |
-| **Low** | API failed or rules missing/unclear | Ask for context or manual review |
+| **High** | API success + rules parsed + metadata complete | Proceed |
+| **Medium** | API success but rules sparse | Generate, flag for review |
+| **Low** | API failed or description empty | Use browser fallback |
 
 ### Error Handling
 
@@ -173,8 +192,29 @@ After generating the dynamic archive:
 |-------|----------|
 | API returns "private" | Report "Subreddit is private", ask for alternate |
 | API returns "Not Found" | Check spelling, suggest similar subs |
-| Rules section not found | Proceed without rules, flag as "unmoderated or hidden" |
-| Rate limited / captcha | Pause and ask user to complete challenge |
+| HTML "Blocked" response | Retry with different User-Agent |
+| `.description` empty | Proceed without rules, flag as "unmoderated or hidden" |
+| Rate limited | Wait 60s and retry, or use cached data |
+
+---
+
+## Quick Reference: API Endpoints
+
+```bash
+# Subreddit metadata + rules
+curl -sL -A "Mozilla/5.0" "https://www.reddit.com/r/{sub}/about.json"
+
+# Recent posts (for content analysis)
+curl -sL -A "Mozilla/5.0" "https://www.reddit.com/r/{sub}/new.json?limit=10"
+
+# Hot posts
+curl -sL -A "Mozilla/5.0" "https://www.reddit.com/r/{sub}/hot.json?limit=10"
+
+# Top posts (all time)
+curl -sL -A "Mozilla/5.0" "https://www.reddit.com/r/{sub}/top.json?limit=10"
+```
+
+**All endpoints support `.json` suffix for API access.**
 
 ---
 
