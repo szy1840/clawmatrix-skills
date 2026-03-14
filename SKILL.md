@@ -25,6 +25,7 @@ Execute Reddit actions by intent and semantics, not static selectors.
 5. Require confirmation text for destructive/high-visibility actions when user did not explicitly pre-authorize immediate send.
 6. **Browser Profile:** Always use `profile="openclaw"` (isolated browser). Do NOT use `profile="chrome"` unless explicitly requested.
 7. **Cleanup:** After all tasks complete, close the browser with `browser(action=close, targetId=<last_targetId>)`.
+8. **No Markdown in Content:** When drafting comments or posts, NEVER use Markdown formatting (e.g., `**bold**`, `*italic*`, `# headers`). Write plain text only — Reddit comments do not render Markdown.
 
 ## Resource Index
 
