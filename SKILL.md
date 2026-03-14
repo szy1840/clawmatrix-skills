@@ -23,6 +23,8 @@ Execute Reddit actions by intent and semantics, not static selectors.
 3. Re-snapshot after each navigation, modal open/close, submit, or failure.
 4. Validate page state before action (logged-in, subreddit resolved, composer visible, button enabled).
 5. Require confirmation text for destructive/high-visibility actions when user did not explicitly pre-authorize immediate send.
+6. **Browser Profile:** Always use `profile="openclaw"` (isolated browser). Do NOT use `profile="chrome"` unless explicitly requested.
+7. **Cleanup:** After all tasks complete, close the browser with `browser(action=close, targetId=<last_targetId>)`.
 
 ## Resource Index
 
