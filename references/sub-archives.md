@@ -99,4 +99,20 @@
 
 ---
 
-_Last updated: 2026-03-06_
+## r/AI_UGC_Marketing
+
+**Description:** Community for AI-powered content creation and marketing. Discusses AI tools, strategies, and real-life use cases where AI drives content and performance. 13k+ members.
+
+**Top Rules:**
+1. Share valuable insights — no pure self-promotion
+2. Engage with AI tools, trends, and strategies
+3. Community is relatively permissive; skeptical but open tone
+
+**Notes:**
+- Tone: mixed — some enthusiasts, many skeptics (especially on video quality)
+- Quality critiques common; defend with nuance, not cheerleading
+- Works: technical workflow angles, honest trade-off discussions, questions that invite OP engagement
+
+---
+
+_Last updated: 2026-03-14_

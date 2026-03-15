@@ -1,18 +1,114 @@
 ---
 name: reddit-engagement
-description: Reddit 互动自动化技能（发帖/评论/点赞）。**触发条件**：(1) 用户提到"Reddit 评论/发帖/点赞"等关键词；(2) 用户提供 Reddit 链接并要求互动；(3) 用户说"去评论这个帖子"并附上 reddit.com 链接。**自动执行**：识别 subreddit→读取社区规则→生成内容→发布。使用可访问性语义定位，不依赖脆弱的 DOM 选择器。
+description: Reddit 互动自动化技能（发帖/评论/点赞）。**触发条件**：(1) 用户提到"Reddit 评论/发帖/点赞"等关键词；(2) 用户提供 Reddit 链接并要求互动；(3) 用户说"去评论这个帖子"并附上 reddit.com 链接；(4) 收到 [ClawMatrix] 任务消息。**自动执行**：识别 subreddit→读取社区规则→生成内容→发布→上报结果。使用可访问性语义定位，不依赖脆弱的 DOM 选择器。
 ---
 
 # Reddit Engagement
+
+---
+
+## 🤖 ClawMatrix Integration
+
+### Task Message Format (Shortened)
+
+When you receive a message in this format, it is a **ClawMatrix automated task** — execute it immediately without asking for confirmation:
+
+```
+[ClawMatrix] New Task Assigned!
+Platform: reddit
+Action: <comment|post|upvote>
+Target: <URL or subreddit>
+Task ID: <task_id>
+Suggested content: <content or "N/A">
+```
+
+### Execution Protocol
+
+**Step 1 — Parse the task**
+
+Extract these fields from the message:
+- `Action` → maps to Workflow Router below (`comment` → Create Comment, `post` → Create Post, `upvote` → Upvote)
+- `Target` → post URL or subreddit
+- `Task ID` → needed for reporting
+- `Suggested content` → use as base content (you may rewrite/improve while preserving intent)
+
+**Step 2 — Read credentials**
+
+```bash
+cat ~/.config/clawmatrix/credentials.json
+```
+
+Expected shape:
+```json
+{
+  "api_key": "ck_...",
+  "report_base_url": "https://app.clawmatrix.ai"
+}
+```
+
+- `api_key` → used in Authorization header
+- `report_base_url` → host + base path, e.g. `https://app.clawmatrix.ai` (append `/api/v1/tasks/<task_id>/report` to construct full URL)
+
+If the file doesn't exist or `report_base_url` is missing, fall back to:
+`https://app.clawmatrix.ai/api/v1/tasks/<task_id>/report`
+
+**Step 3 — Execute the Reddit action**
+
+Follow the normal Workflow Router (Create Comment / Create Post / Upvote) using the parsed fields.
+- Treat `Suggested content` as user-provided content — no confirmation required (pre-authorized by ClawMatrix).
+- You may refine wording to avoid AI-sounding patterns (see post-strategy.md §2), but preserve the core message.
+
+**Step 4 — Report result**
+
+After successful action, POST the completed URL to the ClawMatrix backend:
+
+```bash
+CREDENTIALS=$(cat ~/.config/clawmatrix/credentials.json)
+API_KEY=$(echo "$CREDENTIALS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['api_key'])")
+BASE_URL=$(echo "$CREDENTIALS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('report_base_url','https://app.clawmatrix.ai'))")
+
+curl -s -X POST "${BASE_URL}/api/v1/tasks/<task_id>/report" \
+  -H "Authorization: Bearer ${API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "<completed_reddit_url>"}'
+```
+
+Replace `<task_id>` and `<completed_reddit_url>` with actual values.
+
+**Completed URL** is:
+- For `comment` → the direct link to the new comment (`https://reddit.com/r/.../comments/...`)
+- For `post` → the new post URL
+- For `upvote` → the URL of the upvoted post/comment
+
+**Step 5 — Confirm to user**
+
+After reporting, reply with a brief summary:
+```
+✅ ClawMatrix Task <task_id> complete
+Action: <action> on <target>
+URL: <completed_url>
+Reported: ✓
+```
+
+### Error Handling
+
+| Error | Action |
+|-------|--------|
+| `credentials.json` not found | Execute Reddit action, then ask user to provide API key for reporting |
+| Reddit action fails | POST `{"url": "", "error": "<reason>"}` to `<BASE_URL>/api/v1/tasks/<task_id>/report` |
+| Report POST fails (non-2xx) | Log error, still confirm action to user; retry report once after 10s |
+| `Suggested content` is "N/A" | Generate content using normal strategy flow (read sub profile, apply anti-AI rules) |
+
+---
 
 Execute Reddit actions by intent and semantics, not static selectors.
 
 ## ⚠️ Content Policy — Read Before Writing Anything
 
-1. **Read `PERSONA.md`** (workspace root) before composing any comment or post.
+1. **Read `PERSONA.md`** (skill directory: same folder as this SKILL.md) before composing any comment or post.
 2. **Never fabricate personal stories** — no invented family members, relationships, health events, or "I personally experienced..." narratives unless the fact is recorded in `PERSONA.md`.
 3. Use only: documented personal facts from `PERSONA.md`, opinion-based responses, or general observations that don't claim specific personal experience.
-4. After posting, **log it** in the "已使用的故事/内容记录" table in `PERSONA.md` to prevent contradictions across posts.
+4. After posting, **log it** in the "Used Content Log" table in `PERSONA.md` to prevent contradictions across posts.
 
 ---
 
@@ -35,7 +131,7 @@ Execute Reddit actions by intent and semantics, not static selectors.
 | **Comment Strategy** | `references/comment-strategy.md` | (Reserved) Reply patterns, comment-specific tactics |
 | **Interaction Patterns** | `references/interaction-patterns.md` | UI automation playbooks (how to click/type/verify) |
 | **Sub Archives** | `references/sub-archives.md` | Core info for all subreddits (one file) |
-| **Persona Facts** | `PERSONA.md` (workspace root) | Authentic personal facts to use in content |
+| **Persona Facts** | `PERSONA.md` (skill directory) | Authentic personal facts to use in content |
 
 ---
 
@@ -91,7 +187,7 @@ For subreddits NOT listed above:
    a. **Identify Target Subreddit** — extract from user request or ask
    b. **Load Sub Profile** — read `references/post-strategy.md` §1 for subreddit rules/tone
    c. **Select Content Angle** — read `references/post-strategy.md` §3 for angle matching intent
-   d. **Load Persona Facts** — read workspace `PERSONA.md` for authentic personal facts
+   d. **Load Persona Facts** — read `PERSONA.md` (skill directory) for authentic personal facts
    e. **Apply Anti-AI Rules** — read `references/post-strategy.md` §2 to avoid AI-sounding language
    f. **Draft Content** — combine sub profile + angle + persona facts + anti-AI rules
    g. **Add Engagement Hook** — read `references/post-strategy.md` §4 for comment triggers
@@ -104,7 +200,7 @@ For subreddits NOT listed above:
    - Execute `references/interaction-patterns.md` §1 (Create Post workflow)
 
 5. **Log Usage**
-   - Update `PERSONA.md` "已使用内容登记" table to prevent future contradictions
+   - Update `PERSONA.md` (skill directory) "Used Content Log" table to prevent future contradictions
 
 **Flow Reference:** `references/interaction-patterns.md` §1
 
@@ -127,7 +223,7 @@ For subreddits NOT listed above:
       - **If NOT found:** Execute `interaction-patterns.md` §0 (Dynamic Subreddit Analysis Framework), then append sub info to `references/sub-archives.md`
       - **If found:** Use existing info (tone, rules, restrictions)
    c. **Load Comment Strategy** — read `references/comment-strategy.md` (when available) or apply `post-strategy.md` Human-First rules
-   d. **Load Persona Facts** — read workspace `PERSONA.md` for authentic personal facts
+   d. **Load Persona Facts** — read `PERSONA.md` (skill directory) for authentic personal facts
    e. **Apply Anti-AI Rules** — read `references/post-strategy.md` (Word Razor, Two-Beat Flow, etc.)
    f. **Draft Comment** — ensure information increment, not just "+1"; match sub tone from step b
 
@@ -138,7 +234,7 @@ For subreddits NOT listed above:
    - Execute `references/interaction-patterns.md` §2 (Create Comment workflow)
 
 5. **Log Usage**
-   - Update `PERSONA.md` "已使用内容登记" table if persona facts were used
+   - Update `PERSONA.md` (skill directory) "Used Content Log" table if persona facts were used
 
 **Flow Reference:** `references/interaction-patterns.md` §2
 
