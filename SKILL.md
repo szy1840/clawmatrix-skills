@@ -1,6 +1,6 @@
 ---
-name: reddit-engagement
-description: Reddit 互动自动化技能（发帖/评论/点赞）。**触发条件**：(1) 用户提到"Reddit 评论/发帖/点赞"等关键词；(2) 用户提供 Reddit 链接并要求互动；(3) 用户说"去评论这个帖子"并附上 reddit.com 链接；(4) 收到 [ClawMatrix] 任务消息。**自动执行**：识别 subreddit→读取社区规则→生成内容→发布→上报结果。使用可访问性语义定位，不依赖脆弱的 DOM 选择器。
+name: clawmatrix-skill
+description: ClawMatrix Reddit 技能（技能目录名 clawmatrix-skill）。发帖/评论/点赞自动化。**触发条件**：(1) 用户提到 Reddit 评论/发帖/点赞等；(2) 用户提供 Reddit 链接并要求互动；(3) 用户说去评论某帖并附 reddit.com 链接；(4) 收到 [ClawMatrix] 任务消息。**自动执行**：识别 subreddit→读规则→生成内容→发布→API 上报→**完成后向 ClawMatrix WhatsApp 发 success 或 failed**（见 Step 6）。语义与 a11y 驱动自动化，不用脆弱 DOM 选择器。
 ---
 
 # Reddit Engagement
@@ -90,6 +90,25 @@ URL: <completed_url>
 Reported: ✓
 ```
 
+**Step 6 — WhatsApp completion ping (mandatory)**
+
+After **every** ClawMatrix task run reaches a **terminal state** (you finished Step 4 report attempt—success or error body sent—or you could not report but the task attempt is over), you **must** notify ClawMatrix via WhatsApp to **`+18559102217`** on the **WhatsApp** channel.
+
+Send **exactly one** of these plaintext words—**no punctuation, no extra words, no URLs, no newlines**:
+
+| Outcome | Message body | When to use |
+|--------|----------------|-------------|
+| **Full success** | `success` | Reddit action in Step 3 **succeeded** **and** the Step 4 report POST **succeeded** (2xx) with a valid completed `url` for the task. |
+| **Any failure** | `failed` | Anything else: Reddit failed; report POST failed or non-2xx; could not read credentials; could not POST report after retries; partial success only; or any error path from Error Handling. |
+
+Rules:
+
+1. Use your environment’s message/send capability (e.g. message tool: WhatsApp to that E.164 target).
+2. Send **once per task** after you are truly done (after attempting Step 4 per the table above).
+3. If WhatsApp send fails, log it briefly for the user and **do not retry in a loop**; still complete Step 5 if not already done.
+
+`npx @clawmatrix/install` on the user machine adds this number to OpenClaw WhatsApp **allowFrom** when possible. The **outbound `success` / `failed`** ping is **always required** after each task.
+
 ### Error Handling
 
 | Error | Action |
@@ -98,6 +117,7 @@ Reported: ✓
 | Reddit action fails | POST `{"url": "", "error": "<reason>"}` to `<BASE_URL>/api/v1/tasks/<task_id>/report` |
 | Report POST fails (non-2xx) | Log error, still confirm action to user; retry report once after 10s |
 | `Suggested content` is "N/A" | Generate content using normal strategy flow (read sub profile, apply anti-AI rules) |
+| WhatsApp `success` / `failed` ping fails | Log once; do not spam retries; still finish Task user summary |
 
 ---
 
