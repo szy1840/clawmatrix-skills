@@ -1,6 +1,6 @@
 ---
 name: clawmatrix-skill
-description: ClawMatrix Reddit 技能（技能目录名 clawmatrix-skill）。发帖/评论/点赞自动化。**触发条件**：(1) 用户提到 Reddit 评论/发帖/点赞等；(2) 用户提供 Reddit 链接并要求互动；(3) 用户说去评论某帖并附 reddit.com 链接；(4) 收到 [ClawMatrix] 任务消息。**自动执行**：识别 subreddit→读规则→生成内容→发布→API 上报→**完成后向 ClawMatrix WhatsApp 发 success 或 failed**（见 Step 6）。语义与 a11y 驱动自动化，不用脆弱 DOM 选择器。
+description: ClawMatrix Reddit 技能（技能目录名 clawmatrix-skill）。发帖/评论/点赞自动化。**触发条件**：(1) 用户提到 Reddit 评论/发帖/点赞等；(2) 用户提供 Reddit 链接并要求互动；(3) 用户说去评论某帖并附 reddit.com 链接；(4) 收到 [ClawMatrix] 任务消息。**自动执行**：识别 subreddit→读规则→生成内容→发布→API 上报→**若 openclaw.json 的 WhatsApp allowFrom 含 +18559102217，则完成后发 success/failed**（见 Step 6）。语义与 a11y 驱动自动化，不用脆弱 DOM 选择器。
 ---
 
 # Reddit Engagement
@@ -90,11 +90,19 @@ URL: <completed_url>
 Reported: ✓
 ```
 
-**Step 6 — WhatsApp completion ping (mandatory)**
+**Step 6 — WhatsApp completion ping (conditional)**
 
-After **every** ClawMatrix task run reaches a **terminal state** (you finished Step 4 report attempt—success or error body sent—or you could not report but the task attempt is over), you **must** notify ClawMatrix via WhatsApp to **`+18559102217`** on the **WhatsApp** channel.
+After **every** ClawMatrix task run reaches a **terminal state** (you finished Step 4 report attempt—success or error body sent—or you could not report but the task attempt is over), **first** decide whether WhatsApp reporting is enabled:
 
-Send **exactly one** of these plaintext words—**no punctuation, no extra words, no URLs, no newlines**:
+1. **Read OpenClaw config** (same machine as the agent), e.g.:
+   ```bash
+   cat ~/.openclaw/openclaw.json
+   ```
+2. Parse JSON. Let `allowFrom` be `channels.whatsapp.allowFrom` (must be an **array** of strings).
+3. **Only if** `allowFrom` **includes the exact string** `+18559102217` (same E.164 as in config—no spaces), proceed to send WhatsApp below.
+4. **If** `openclaw.json` is missing, invalid JSON, `channels.whatsapp` / `allowFrom` is absent, or `+18559102217` is **not** in `allowFrom` → **do not** send any WhatsApp message for Step 6; **do not** treat this as an error; still complete Step 5 as usual.
+
+**When Step 6 applies** (number is in `allowFrom`), send to **`+18559102217`** on the **WhatsApp** channel **exactly one** of these plaintext words—**no punctuation, no extra words, no URLs, no newlines**:
 
 | Outcome | Message body | When to use |
 |--------|----------------|-------------|
@@ -104,10 +112,10 @@ Send **exactly one** of these plaintext words—**no punctuation, no extra words
 Rules:
 
 1. Use your environment’s message/send capability (e.g. message tool: WhatsApp to that E.164 target).
-2. Send **once per task** after you are truly done (after attempting Step 4 per the table above).
+2. Send **at most once per task** when Step 6 applies.
 3. If WhatsApp send fails, log it briefly for the user and **do not retry in a loop**; still complete Step 5 if not already done.
 
-`npx @clawmatrix/install` on the user machine adds this number to OpenClaw WhatsApp **allowFrom** when possible. The **outbound `success` / `failed`** ping is **always required** after each task.
+Optional: `npx @clawmatrix/install` can add `+18559102217` to **allowFrom** so users who want ClawMatrix pings opt in via OpenClaw config.
 
 ### Error Handling
 
@@ -117,7 +125,8 @@ Rules:
 | Reddit action fails | POST `{"url": "", "error": "<reason>"}` to `<BASE_URL>/api/v1/tasks/<task_id>/report` |
 | Report POST fails (non-2xx) | Log error, still confirm action to user; retry report once after 10s |
 | `Suggested content` is "N/A" | Generate content using normal strategy flow (read sub profile, apply anti-AI rules) |
-| WhatsApp `success` / `failed` ping fails | Log once; do not spam retries; still finish Task user summary |
+| Step 6 skipped (`+18559102217` not in `allowFrom`) | Normal; no WhatsApp |
+| WhatsApp `success` / `failed` send fails (when Step 6 applied) | Log once; do not spam retries; still finish Task user summary |
 
 ---
 
