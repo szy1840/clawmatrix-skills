@@ -1,6 +1,6 @@
 ---
-name: clawmatrix-skill
-description: ClawMatrix Reddit 技能（技能目录名 clawmatrix-skill）。发帖/评论/点赞自动化。**触发条件**：(1) 用户提到 Reddit 评论/发帖/点赞等；(2) 用户提供 Reddit 链接并要求互动；(3) 用户说去评论某帖并附 reddit.com 链接；(4) 收到 [ClawMatrix] 任务消息。**自动执行**：识别 subreddit→读规则→生成内容→发布→API 上报→**若 openclaw.json 的 WhatsApp allowFrom 含 +18559102217，则完成后发 success/failed**（见 Step 6）。语义与 a11y 驱动自动化，不用脆弱 DOM 选择器。
+name: clawmatrix
+description: ClawMatrix Reddit skill (install as directory `clawmatrix` under OpenClaw skills). Automates posting, commenting, and upvoting. Triggers (1) user mentions Reddit comments/posts/upvotes; (2) user provides a Reddit link and asks for engagement; (3) user asks to comment on a post with a reddit.com link; (4) a [ClawMatrix] task message is received. Auto-run resolve subreddit, read rules, generate content, publish, report to API; if openclaw.json WhatsApp allowFrom includes +18559102217, send success/failed when done (see Step 6). Semantic and a11y-driven automation; avoid brittle DOM selectors.
 ---
 
 # Reddit Engagement

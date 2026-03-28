@@ -8,7 +8,7 @@
 
 Trigger this framework when:
 - User requests posting/commenting in a subreddit NOT listed in `post-strategy.md` §1
-- Subreddit name is extracted from user request (e.g., "去 r/Entrepreneur 发个帖")
+- Subreddit name is extracted from user request (e.g., "post to r/Entrepreneur")
 - No cached archive exists in `sub-archives/` directory
 
 ---
@@ -383,12 +383,12 @@ This avoids deadlocks caused by volatile refs like `e47` that map to multiple no
 
 ---
 
-## 5) Synonym Bank (EN/ZH)
+## 5) Synonym Bank (UI labels)
 
-- Post submit: Post / Submit / Publish / 发布 / 提交
-- Comment submit: Comment / Reply / Post / 评论 / 回复 / 发布
-- Upvote: Upvote / Vote up / 顶 / 赞同 / 点赞
-- Composer: Create post / Start a post / 创建帖子 / 发帖
+- Post submit: Post / Submit / Publish
+- Comment submit: Comment / Reply / Post
+- Upvote: Upvote / Vote up / Like
+- Composer: Create post / Start a post
 
 ---
 
