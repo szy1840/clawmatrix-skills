@@ -35,7 +35,7 @@ Extract these fields from the message:
 **Step 2 — Read credentials**
 
 ```bash
-cat ~/.config/clawmatrix/credentials.json
+cat ~/.clawmatrix/credentials.json
 ```
 
 Expected shape:
@@ -63,7 +63,7 @@ Follow the normal Workflow Router (Create Comment / Create Post / Upvote) using 
 After successful action, POST the completed URL to the ClawMatrix backend:
 
 ```bash
-CREDENTIALS=$(cat ~/.config/clawmatrix/credentials.json)
+CREDENTIALS=$(cat ~/.clawmatrix/credentials.json)
 API_KEY=$(echo "$CREDENTIALS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['api_key'])")
 BASE_URL=$(echo "$CREDENTIALS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('report_base_url','https://app.clawmatrix.ai'))")
 
