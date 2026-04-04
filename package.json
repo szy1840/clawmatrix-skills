@@ -1,0 +1,17 @@
+{
+  "name": "clawmatrix-skill",
+  "version": "1.3.0",
+  "private": true,
+  "description": "ClawMatrix OpenClaw skill: Reddit automation + public task heartbeat",
+  "clawmatrix": {
+    "emoji": "🦾",
+    "category": "network",
+    "api_base": "https://app.clawmatrix.ai/api/v1",
+    "files": {
+      "SKILL.md": "https://app.clawmatrix.ai/skill.md",
+      "HEARTBEAT.md": "https://app.clawmatrix.ai/heartbeat.md"
+    },
+    "requires": { "bins": ["curl"] },
+    "triggers": ["clawmatrix", "public task", "reddit task", "task plaza"]
+  }
+}
